@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Total-Recall</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1F2328">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Total-Recall">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+<style>
+  :root {
+    --bg-page:#FAFAF8; --surface-1:#F1EFE8; --surface-2:#FFFFFF;
+    --ink:#1F2328; --ink-secondary:#6B6E72; --ink-muted:#9A9C9F;
+    --border:#E4E1D8; --border-strong:#D3D1C7;
+    --red:#E24B4A; --red-text:#A32D2D;
+    --amber:#EF9F27; --amber-text:#854F0B;
+    --teal:#5DCAA5; --teal-text:#0F6E56;
+    --grey:#B4B2A9;
+    --radius:12px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg-page); color:var(--ink); -webkit-tap-highlight-color:transparent; }
+  #app { max-width:420px; margin:0 auto; min-height:100vh; background:var(--bg-page); display:flex; flex-direction:column; }
+  header { position:sticky; top:0; background:var(--bg-page); padding:14px 16px 8px; display:flex; align-items:center; z-index:10; }
+  .back-btn { width:32px; height:32px; border-radius:50%; border:0.5px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-secondary); flex-shrink:0; visibility:hidden; }
+  .back-btn.visible { visibility:visible; }
+  .back-btn:active { transform:scale(0.94); }
+  .header-center { flex:1; text-align:center; display:flex; flex-direction:column; align-items:center; }
+  .app-name { font-size:16px; font-weight:500; letter-spacing:0.2px; }
+  .teacher-line { font-size:11px; color:var(--ink-secondary); margin-top:1px; }
+  .header-spacer { width:32px; flex-shrink:0; }
+  main { flex:1; padding:8px 16px 90px; }
+  .screen { display:none; }
+  .screen.active { display:block; }
+
+  nav.tabbar { position:sticky; bottom:0; background:var(--surface-2); border-top:0.5px solid var(--border); display:flex; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
+  nav.tabbar button { flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 0; color:var(--ink-muted); cursor:pointer; font-size:11px; font-family:inherit; }
+  nav.tabbar button.active { color:var(--ink); }
+  nav.tabbar .icon { font-size:20px; line-height:1; }
+
+  .row { display:flex; align-items:center; gap:12px; background:var(--surface-2); border:0.5px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:8px; cursor:pointer; transition:transform .08s ease; }
+  .row:active { transform:scale(0.985); }
+  .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .dot.red { background:var(--red); } .dot.amber { background:var(--amber); }
+  .dot.teal { background:var(--teal); } .dot.grey { background:var(--grey); opacity:.4; }
+  .row-mid { flex:1; min-width:0; }
+  .row-title { font-size:14px; font-weight:500; margin:0; }
+  .row-sub { font-size:12px; color:var(--ink-secondary); margin:2px 0 0; }
+  .row-sub.red { color:var(--red-text); }
+  .row-count { font-size:13px; color:var(--ink-muted); }
+  .chev { color:var(--ink-muted); font-size:16px; }
+
+  .avatar { width:36px; height:36px; border-radius:50%; background:var(--surface-1); border:0.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:500; color:var(--ink-secondary); flex-shrink:0; }
+  .book-icon { width:36px; height:36px; border-radius:10px; background:var(--surface-1); border:0.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+
+  h1.page-title { font-size:18px; font-weight:500; margin:4px 0 2px; }
+  p.page-sub { font-size:13px; color:var(--ink-secondary); margin:0 0 16px; }
+  p.section-label { font-size:13px; color:var(--ink-secondary); margin:0 0 8px; }
+  p.section-label.red { color:var(--red-text); }
+
+  .chip-row { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .chip { font-size:12px; padding:6px 12px; border-radius:20px; background:var(--surface-1); border:0.5px solid var(--border); color:var(--ink-secondary); cursor:pointer; }
+  .chip.active { background:var(--ink); color:var(--surface-2); border-color:var(--ink); }
+
+  .pill-badge { display:flex; align-items:center; gap:6px; background:var(--surface-1); border:0.5px solid var(--border); border-radius:20px; padding:6px 12px; font-size:13px; font-weight:500; }
+
+  .dotgroup { display:flex; gap:8px; }
+  .dotgroup span { display:flex; align-items:center; gap:3px; font-size:11px; color:var(--ink-muted); }
+  .dotgroup .mini { width:8px; height:8px; border-radius:50%; }
+
+  .empty-state { text-align:center; padding:36px 16px; background:var(--surface-2); border:0.5px solid var(--border); border-radius:16px; }
+  .empty-state .icon { font-size:30px; margin-bottom:10px; }
+  .empty-state h3 { font-size:15px; font-weight:500; margin:0 0 6px; }
+  .empty-state p { font-size:13px; color:var(--ink-secondary); margin:0 0 16px; }
+  .empty-state button { padding:10px 18px; border-radius:10px; background:var(--ink); color:var(--surface-2); border:none; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; }
+
+  .log-card { background:var(--surface-2); border:0.5px solid var(--border); border-radius:16px; padding:20px; margin-bottom:16px; }
+  .log-head { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .log-head .dot { width:14px; height:14px; }
+  .state-line { font-size:13px; color:var(--ink-secondary); margin:0 0 18px; }
+
+  .result-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .result-btn { border-radius:12px; padding:16px 8px; font-size:13px; font-weight:500; border:1.5px solid var(--border); background:var(--surface-2); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px; font-family:inherit; color:var(--ink); }
+  .result-btn .circle { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; color:white; }
+  .result-btn.selected { border-color:var(--ink); background:var(--surface-1); }
+
+  .confirm-box { background:var(--surface-1); border-radius:12px; padding:16px; margin-top:16px; display:none; text-align:left; }
+  .confirm-box.show { display:block; }
+  .confirm-box .cstate { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:500; margin-bottom:4px; }
+  .confirm-box .cnext { font-size:13px; color:var(--ink-secondary); margin:0; }
+
+  .save-btn { width:100%; margin-top:16px; padding:14px; border-radius:12px; background:var(--ink); color:var(--surface-2); border:none; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit; }
+  .save-btn:disabled { opacity:.35; cursor:default; }
+
+  .drill-link { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:0.5px solid var(--border); border-radius:12px; padding:12px 14px; cursor:pointer; }
+  .drill-link .label { font-size:13px; font-weight:500; }
+  .drill-link .sub { font-size:11.5px; color:var(--ink-muted); margin-top:1px; }
+
+  .legend-row { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 16px; }
+  .legend-row span { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-secondary); }
+  .legend-dot { width:10px; height:10px; border-radius:50%; }
+
+  .qrow { display:flex; align-items:center; gap:10px; background:var(--surface-2); border:0.5px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .qrow .qnum-label { font-size:13px; font-weight:500; width:28px; flex-shrink:0; }
+  .diff-dots { display:flex; gap:8px; flex:1; justify-content:center; }
+  .diff-dot-btn { width:26px; height:26px; border-radius:50%; border:1.5px solid var(--border-strong); background:var(--surface-2); cursor:pointer; padding:0; flex-shrink:0; }
+  .diff-dot-btn.active-easy { background:var(--teal); border-color:var(--teal); }
+  .diff-dot-btn.active-can_do { background:#9CC7E8; border-color:#9CC7E8; }
+  .diff-dot-btn.active-needs_reading { background:var(--amber); border-color:var(--amber); }
+  .diff-dot-btn.active-hard { background:var(--red); border-color:var(--red); }
+  .diff-dot-btn.dim { opacity:0.35; }
+
+  .qrow .counter-row { display:flex; align-items:center; gap:3px; background:var(--surface-1); border-radius:7px; padding:3px 4px; flex-shrink:0; }
+  .qrow .counter-row button { width:18px; height:18px; border-radius:5px; border:0.5px solid var(--border-strong); background:var(--surface-2); font-size:11px; line-height:1; cursor:pointer; color:var(--ink); font-family:inherit; padding:0; }
+  .qrow .counter-row .count-val { font-size:11px; font-weight:500; min-width:12px; text-align:center; }
+
+  .qrow .next-date { font-size:10px; color:var(--ink-muted); width:46px; text-align:right; flex-shrink:0; }
+
+  .manage-section { margin-bottom:24px; }
+  .manage-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .manage-header h3 { font-size:14px; font-weight:500; margin:0; }
+  .manage-item { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:0.5px solid var(--border); border-radius:10px; padding:10px 12px; margin-bottom:6px; font-size:13px; }
+  .manage-item .qcount { color:var(--ink-muted); font-size:12px; }
+  .remove-btn { width:24px; height:24px; border-radius:50%; border:0.5px solid var(--border); background:var(--surface-1); color:var(--ink-secondary); font-size:13px; cursor:pointer; }
+  .inline-form { display:flex; gap:6px; margin-bottom:10px; }
+  .inline-form input, .inline-form select { flex:1; font-size:13px; padding:8px 10px; border:0.5px solid var(--border-strong); border-radius:8px; font-family:inherit; background:var(--surface-2); color:var(--ink); }
+  .inline-form input.qty { max-width:60px; }
+  .inline-form button { padding:8px 12px; border-radius:8px; background:var(--ink); color:var(--surface-2); border:none; font-size:13px; font-family:inherit; cursor:pointer; }
+  .inline-form button:disabled { opacity:.4; cursor:default; }
+  .class-chip { display:inline-flex; align-items:center; gap:5px; background:var(--surface-1); border:0.5px solid var(--border); border-radius:20px; padding:3px 10px 3px 8px; font-size:11.5px; color:var(--ink-secondary); margin-top:3px; cursor:pointer; }
+  .class-chip .caret { font-size:9px; }
+
+  .class-row { display:flex; align-items:center; gap:12px; background:var(--surface-2); border:0.5px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:8px; cursor:pointer; }
+  .class-row .class-emoji { width:40px; height:40px; border-radius:12px; background:var(--surface-1); border:0.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
+  .class-row .class-name { font-size:15px; font-weight:500; margin:0; }
+
+  .manage-edit-btn { width:24px; height:24px; border-radius:50%; border:0.5px solid var(--border); background:var(--surface-1); color:var(--ink-secondary); font-size:12px; cursor:pointer; margin-right:4px; }
+  .class-edit-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  .class-edit-row input { font-size:13px; padding:8px 10px; border:0.5px solid var(--border-strong); border-radius:8px; font-family:inherit; background:var(--surface-2); color:var(--ink); }
+  .class-edit-row input.emoji-input { max-width:52px; text-align:center; }
+  .class-edit-row input.name-input { flex:1; }
+  .class-edit-row button { padding:8px 10px; border-radius:8px; font-size:12px; font-family:inherit; cursor:pointer; }
+  .class-edit-row .save-mini { background:var(--ink); color:var(--surface-2); border:none; }
+  .class-edit-row .cancel-mini { background:var(--surface-2); border:0.5px solid var(--border-strong); color:var(--ink); }
+  .manage-context-banner { font-size:12px; color:var(--ink-secondary); background:var(--surface-1); border-radius:10px; padding:8px 12px; margin-bottom:16px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <button class="back-btn" id="backBtn" aria-label="Back">&#8592;</button>
+    <div class="header-center">
+      <div class="app-name" id="appName">Total-Recall</div>
+      <div class="teacher-line" id="teacherLine" style="display:none;"></div>
+      <div class="class-chip" id="classChip"><span id="classChipText">Pick a class</span><span class="caret">&#9662;</span></div>
+    </div>
+    <div class="header-spacer"></div>
+  </header>
+
+  <main>
+
+    <section class="screen" id="screen-classpicker">
+      <h1 class="page-title" style="margin-top:4px;">Choose a class</h1>
+      <p class="page-sub">Each class keeps its own subjects, chapters and students, completely separate.</p>
+      <div id="classPickerList"></div>
+      <div id="classPickerEmptyState" style="display:none;"></div>
+    </section>
+
+    <section class="screen active" id="screen-dashboard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <h1 class="page-title" style="margin-top:0;">Today</h1>
+          <p class="page-sub" style="margin-bottom:0;" id="dashDateLabel">Today</p>
+        </div>
+        <div class="pill-badge"><span>&#128293;</span><span id="stuckCount">0 stuck</span></div>
+      </div>
+      <p class="section-label" id="dashSectionLabel" style="display:none;">Chapters due for practice</p>
+      <div id="dashChapterList"></div>
+      <div id="dashEmptyState" style="display:none;"></div>
+    </section>
+
+    <section class="screen" id="screen-chapters">
+      <h1 class="page-title" style="margin-top:4px;">Chapters</h1>
+      <p class="page-sub">Tap a chapter to see students</p>
+      <div id="chaptersList"></div>
+      <div id="chaptersEmptyState" style="display:none;"></div>
+    </section>
+
+    <section class="screen" id="screen-chapter">
+      <p class="page-sub" style="margin-bottom:0;" id="chapterSubj">Physics</p>
+      <h1 class="page-title" id="chapterTitle">Motion in a plane</h1>
+      <div class="chip-row">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="attention">Needs attention</button>
+      </div>
+      <div id="studentList"></div>
+      <div id="studentListEmptyState" style="display:none;"></div>
+    </section>
+
+    <section class="screen" id="screen-student">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div class="avatar" id="studentAvatar" style="width:40px;height:40px;">R</div>
+        <div>
+          <p style="font-weight:500;font-size:16px;margin:0;" id="studentName">Rahul</p>
+          <p style="font-size:13px;color:var(--ink-secondary);margin:0;" id="studentChapter">Motion in a plane</p>
+        </div>
+      </div>
+      <div id="categoryList"></div>
+      <div id="categoryEmptyState" style="display:none;"></div>
+    </section>
+
+    <section class="screen" id="screen-category">
+      <div class="log-card">
+        <div class="log-head">
+          <div class="dot" id="catDot"></div>
+          <div>
+            <p style="font-weight:500;font-size:15px;margin:0;" id="catTitle">Numerical</p>
+            <p style="font-size:12px;color:var(--ink-secondary);margin:0;" id="catSub">Rahul &middot; Motion in a plane</p>
+          </div>
+        </div>
+        <p class="state-line" id="catState">Currently weak</p>
+
+        <div class="result-grid">
+          <button class="result-btn" data-result="incorrect"><div class="circle" style="background:var(--red);">&#10005;</div>Incorrect</button>
+          <button class="result-btn" data-result="partial"><div class="circle" style="background:var(--amber);">&#8776;</div>Partial</button>
+          <button class="result-btn" data-result="correct"><div class="circle" style="background:var(--teal);">&#10003;</div>Correct</button>
+        </div>
+
+        <div class="confirm-box" id="confirmBox">
+          <div class="cstate"><span class="dot" id="confirmDot"></span><span id="confirmState">Now Weak</span></div>
+          <p class="cnext" id="confirmNext">Revise again tomorrow</p>
+        </div>
+
+        <button class="save-btn" id="saveBtn" disabled>Log result</button>
+      </div>
+
+      <div class="drill-link" id="drillLink">
+        <div>
+          <div class="label">View by question</div>
+          <div class="sub">Tag difficulty per question number</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-qtype">
+      <p class="page-sub" style="margin-bottom:2px;" id="qtypeStudent">Rahul</p>
+      <h1 class="page-title" id="qtypeTitle">Numerical</h1>
+      <p class="page-sub">Tap a color per question. Tap again to skip / clear.</p>
+
+      <div class="legend-row">
+        <span><span class="legend-dot" style="background:var(--teal);"></span>Easy</span>
+        <span><span class="legend-dot" style="background:#9CC7E8;"></span>Can do</span>
+        <span><span class="legend-dot" style="background:var(--amber);"></span>Needs reading</span>
+        <span><span class="legend-dot" style="background:var(--red);"></span>Hard</span>
+      </div>
+
+      <div id="qtable"></div>
+    </section>
+
+    <section class="screen" id="screen-manage">
+      <h1 class="page-title" style="margin-top:4px;">Manage</h1>
+      <p class="page-sub">Set up your classes, subjects, chapters, students and question types</p>
+
+      <div class="manage-section">
+        <div class="manage-header"><h3>Your profile</h3></div>
+        <div class="inline-form">
+          <input type="text" id="profileEmojiInput" placeholder="Emoji" style="max-width:64px; text-align:center;">
+          <input type="text" id="profileNameInput" placeholder="Your name (optional)">
+          <button id="saveProfileBtn">Save</button>
+        </div>
+        <p class="hint-text">Shows under the app name at the top. Leave blank to hide.</p>
+      </div>
+
+      <div class="manage-section">
+        <div class="manage-header"><h3>Classes</h3></div>
+        <div class="inline-form">
+          <input type="text" id="newClassEmoji" placeholder="Emoji" style="max-width:56px; text-align:center;">
+          <input type="text" id="newClassInput" placeholder="e.g. Class 9, Class 10">
+          <button id="addClassBtn">Add</button>
+        </div>
+        <p class="hint-text">Each class has its own subjects, chapters and students.</p>
+        <div id="manageClasses"></div>
+      </div>
+
+      <div id="perClassManage">
+      <div class="manage-context-banner" id="manageContextBanner"></div>
+
+      <div class="manage-section">
+        <div class="manage-header"><h3>Subjects</h3></div>
+        <div class="inline-form">
+          <input type="text" id="newSubjectInput" placeholder="e.g. Physics, Chemistry">
+          <button id="addSubjectBtn">Add</button>
+        </div>
+        <p class="hint-text">Add a subject before adding chapters under it.</p>
+        <div id="manageSubjects"></div>
+      </div>
+
+      <div class="manage-section">
+        <div class="manage-header"><h3>Chapters</h3></div>
+        <div class="inline-form">
+          <select id="newChapterSubject"><option value="">Pick a subject</option></select>
+        </div>
+        <div class="inline-form">
+          <input type="text" id="newChapterInput" placeholder="New chapter name">
+          <button id="addChapterBtn">Add</button>
+        </div>
+        <div id="manageChapters"></div>
+      </div>
+
+      <div class="manage-section">
+        <div class="manage-header"><h3>Students</h3></div>
+        <div class="inline-form">
+          <input type="text" id="newStudentEmoji" placeholder="Emoji" style="max-width:56px; text-align:center;">
+          <input type="text" id="newStudentInput" placeholder="Name">
+          <input type="text" id="newStudentRoll" placeholder="Roll" style="max-width:56px;">
+          <button id="addStudentBtn">Add</button>
+        </div>
+        <div id="manageStudents"></div>
+      </div>
+
+      <div class="manage-section">
+        <div class="manage-header"><h3>Question types</h3></div>
+        <div class="inline-form">
+          <input type="text" id="newQtypeInput" placeholder="Type name e.g. HOTS">
+          <input type="number" min="1" class="qty" id="newQtypeCount" placeholder="No.">
+          <button id="addQtypeBtn">Add</button>
+        </div>
+        <div id="manageQtypes"></div>
+      </div>
+      </div>
+
+      <div id="noClassManageHint" style="display:none;">
+        <div class="empty-state">
+          <div class="icon">&#127891;</div>
+          <h3>Pick a class first</h3>
+          <p>Subjects, chapters, students and question types belong to a class. Choose or add one above.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-screen="dashboard"><span class="icon">&#8962;</span>Today</button>
+    <button class="tab" data-screen="chapters"><span class="icon">&#128218;</span>Chapters</button>
+    <button class="tab" data-screen="manage"><span class="icon">&#9881;</span>Manage</button>
+  </nav>
+
+</div>
+
+<script>
+var classes = [];        // [{name, emoji}]
+var classData = {};      // { className: {subjects, chapters, students, qtypes, aggMastery, tags} }
+var currentClassName = null;
+
+var subjects = [];
+var chapters = [];
+var students = [];
+var qtypes = [];
+var aggMastery = {};
+var tags = {};
+var profile = {emoji:'', name:''};
+
+function blankClassData(){
+  return {subjects:[], chapters:[], students:[], qtypes:[], aggMastery:{}, tags:{}};
+}
+
+function switchToClass(name){
+  currentClassName = name;
+  var d = classData[name] || (classData[name] = blankClassData());
+  subjects = d.subjects; chapters = d.chapters; students = d.students;
+  qtypes = d.qtypes; aggMastery = d.aggMastery; tags = d.tags;
+  updateClassChip();
+  renderDashboard();
+  renderChaptersList();
+  renderManage();
+  saveState();
+}
+
+function updateClassChip(){
+  var chip = document.getElementById('classChipText');
+  var cls = classes.find(function(c){ return c.name===currentClassName; });
+  chip.textContent = cls ? ([cls.emoji, cls.name].filter(Boolean).join(' ')) : 'Pick a class';
+}
+
+function goToClassPicker(){
+  navHistory = ['classpicker'];
+  showScreen('classpicker', false);
+}
+
+
+function ensureChapterData(chName){
+  if (!aggMastery[chName]) aggMastery[chName] = {};
+  students.forEach(function(s){
+    if (!aggMastery[chName][s.name]) aggMastery[chName][s.name] = {};
+    qtypes.forEach(function(qt){
+      if (!aggMastery[chName][s.name][qt.name]) aggMastery[chName][s.name][qt.name] = 'grey';
+    });
+  });
+}
+
+var diffOrder = ['easy','can_do','needs_reading','hard'];
+var diffShort = {easy:'Easy', can_do:'Can do', needs_reading:'Needs read', hard:'Hard'};
+
+function suggestedIntervalDays(diff, revisions){
+  revisions = revisions || 1;
+  if (diff === 'hard') return 1;
+  if (diff === 'needs_reading') return revisions >= 2 ? 1 : 3;
+  if (diff === 'can_do') return Math.min(30, 7 + (revisions - 1) * 3);
+  if (diff === 'easy') return Math.min(30, 14 + (revisions - 1) * 5);
+  return 7;
+}
+
+var toneColor = {red:'#E24B4A', amber:'#EF9F27', teal:'#5DCAA5', grey:'var(--ink-muted)'};
+
+function stateLabel(tone){
+  return tone==='red' ? 'Weak' : tone==='amber' ? 'Developing' : tone==='teal' ? 'Mastered' : 'Not started';
+}
+function fmtDate(d){ return d.toLocaleDateString('en-GB', {day:'numeric', month:'short'}); }
+function addDays(days){ var d = new Date(); d.setDate(d.getDate()+days); return d; }
+function avatarContent(s){ return s.emoji ? s.emoji : s.initial; }
+function rollLabel(s){ return s.roll ? ('Roll ' + s.roll + ' \u00b7 ') : ''; }
+
+function categoryTone(chName, studentName, qtypeName){
+  var qtags = tags[chName] && tags[chName][studentName] && tags[chName][studentName][qtypeName];
+  if (qtags){
+    var vals = Object.keys(qtags).map(function(k){ return qtags[k]; }).filter(function(t){ return t.diff; });
+    if (vals.length){
+      if (vals.some(function(t){ return t.diff==='hard'; })) return 'red';
+      if (vals.some(function(t){ return t.diff==='needs_reading'; })) return 'amber';
+      return 'teal';
+    }
+  }
+  return (aggMastery[chName] && aggMastery[chName][studentName] && aggMastery[chName][studentName][qtypeName]) || 'grey';
+}
+
+function emptyState(icon, title, msg, btnLabel, onClick){
+  var el = document.createElement('div'); el.className='empty-state';
+  el.innerHTML =
+    '<div class="icon">'+icon+'</div>'+
+    '<h3>'+title+'</h3>'+
+    '<p>'+msg+'</p>';
+  if (btnLabel){
+    var btn = document.createElement('button'); btn.textContent = btnLabel;
+    btn.addEventListener('click', onClick);
+    el.appendChild(btn);
+  }
+  return el;
+}
+
+function goToManage(){
+  navHistory = ['manage'];
+  showScreen('manage', false);
+}
+
+var navHistory = ['dashboard'];
+function showScreen(name, push){
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('screen-'+name).classList.add('active');
+  if (push !== false) navHistory.push(name);
+  document.getElementById('backBtn').classList.toggle('visible', navHistory.length > 1);
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.screen===name); });
+  window.scrollTo(0,0);
+}
+document.getElementById('backBtn').addEventListener('click', function(){
+  if (navHistory.length>1){ navHistory.pop(); showScreen(navHistory[navHistory.length-1], false); }
+});
+document.querySelectorAll('nav.tabbar .tab').forEach(function(tab){
+  tab.addEventListener('click', function(){ navHistory=[tab.dataset.screen]; showScreen(tab.dataset.screen, false); });
+});
+
+function renderDashboard(){
+  var listWrap = document.getElementById('dashChapterList');
+  var emptyWrap = document.getElementById('dashEmptyState');
+  var label = document.getElementById('dashSectionLabel');
+  listWrap.innerHTML=''; emptyWrap.innerHTML='';
+
+  if (!currentClassName){
+    label.style.display='none';
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#127891;', 'Pick a class', 'Choose which class you\u2019re working on to see what\u2019s due.', 'Choose a class', goToClassPicker));
+    document.getElementById('stuckCount').textContent = '0 stuck';
+    return;
+  }
+
+  if (chapters.length===0){
+    label.style.display='none';
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#128218;', 'Set up your first chapter', 'Add a subject and chapter in Manage to start tracking revision.', 'Go to Manage', goToManage));
+    document.getElementById('stuckCount').textContent = '0 stuck';
+    return;
+  }
+
+  var stuck = 0, anyDue = false;
+  chapters.forEach(function(ch){
+    ensureChapterData(ch.name);
+    var dueCount = 0, worst = 'teal';
+    students.forEach(function(s){
+      qtypes.forEach(function(qt){
+        var tone = categoryTone(ch.name, s.name, qt.name);
+        if (tone==='red'){ dueCount++; worst='red'; }
+        else if (tone==='amber' && worst!=='red'){ dueCount++; worst='amber'; }
+      });
+    });
+    if (dueCount===0) return;
+    anyDue = true;
+    if (worst==='red') stuck++;
+    var el = document.createElement('div'); el.className='row';
+    el.innerHTML =
+      '<div class="book-icon">&#128218;</div>'+
+      '<div class="row-mid"><p class="row-title">'+ch.name+'</p><p class="row-sub">'+(ch.subjectName||'')+'</p></div>'+
+      '<span class="row-count">'+dueCount+' due</span>'+
+      '<span class="chev">&#8250;</span>';
+    el.addEventListener('click', function(){ openChapter(ch.name); });
+    listWrap.appendChild(el);
+  });
+  document.getElementById('stuckCount').textContent = stuck + ' stuck';
+
+  if (!anyDue){
+    label.style.display='none';
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#10003;', 'Nothing due today', 'Log some results and revision will show up here automatically.', 'View chapters', function(){
+      navHistory = ['chapters']; showScreen('chapters', false);
+    }));
+  } else {
+    label.style.display='block';
+    emptyWrap.style.display='none';
+  }
+}
+
+function renderChaptersList(){
+  var wrap = document.getElementById('chaptersList');
+  var emptyWrap = document.getElementById('chaptersEmptyState');
+  wrap.innerHTML=''; emptyWrap.innerHTML='';
+
+  if (!currentClassName){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#127891;', 'Pick a class', 'Choose which class you\u2019re working on first.', 'Choose a class', goToClassPicker));
+    return;
+  }
+
+  if (chapters.length===0){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#128218;', 'No chapters yet', 'Add a subject, then your first chapter, in Manage.', 'Go to Manage', goToManage));
+    return;
+  }
+  emptyWrap.style.display='none';
+
+  chapters.forEach(function(ch){
+    var el = document.createElement('div'); el.className='row';
+    el.innerHTML =
+      '<div class="book-icon">&#128218;</div>'+
+      '<div class="row-mid"><p class="row-title">'+ch.name+'</p><p class="row-sub">'+(ch.subjectName||'')+'</p></div>'+
+      '<span class="chev">&#8250;</span>';
+    el.addEventListener('click', function(){ openChapter(ch.name); });
+    wrap.appendChild(el);
+  });
+}
+
+var currentChapter = null;
+function openChapter(name){
+  currentChapter = name;
+  ensureChapterData(name);
+  var ch = chapters.find(function(c){ return c.name===name; });
+  document.getElementById('chapterSubj').textContent = ch ? (ch.subjectName||'') : '';
+  document.getElementById('chapterTitle').textContent = name;
+  renderStudentsForChapter('all');
+  showScreen('chapter');
+}
+function renderStudentsForChapter(filter){
+  var wrap = document.getElementById('studentList');
+  var emptyWrap = document.getElementById('studentListEmptyState');
+  wrap.innerHTML=''; emptyWrap.innerHTML='';
+
+  if (students.length===0){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#128100;', 'No students yet', 'Add students in Manage to start tracking their progress.', 'Go to Manage', goToManage));
+    return;
+  }
+  if (qtypes.length===0){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#128221;', 'No question types yet', 'Add question types (e.g. Very short, Numerical) in Manage.', 'Go to Manage', goToManage));
+    return;
+  }
+  emptyWrap.style.display='none';
+
+  var shown = 0;
+  students.forEach(function(s){
+    var counts = {red:0,amber:0,teal:0,grey:0};
+    qtypes.forEach(function(qt){ counts[categoryTone(currentChapter, s.name, qt.name)]++; });
+    var attention = counts.red>0;
+    if (filter==='attention' && !attention) return;
+    shown++;
+    var headline = counts.red>0 ? counts.red+' weak, due today' : (counts.amber>0 ? 'Developing' : (counts.teal===qtypes.length ? 'All mastered' : 'On track'));
+    var dotsHtml='';
+    ['red','amber','teal','grey'].forEach(function(t){
+      if (counts[t]) dotsHtml += '<span><span class="mini" style="background:'+toneColor[t]+(t==='grey'?';opacity:.4':'')+'"></span>'+counts[t]+'</span>';
+    });
+    var row = document.createElement('div'); row.className='row';
+    row.innerHTML =
+      '<div class="avatar">'+avatarContent(s)+'</div>'+
+      '<div class="row-mid"><p class="row-title">'+s.name+'</p><p class="row-sub">'+rollLabel(s)+headline+'</p></div>'+
+      '<div class="dotgroup">'+dotsHtml+'</div>'+
+      '<span class="chev">&#8250;</span>';
+    row.addEventListener('click', function(){ openStudent(s.name, avatarContent(s)); });
+    wrap.appendChild(row);
+  });
+
+  if (shown===0 && filter==='attention'){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#128077;', 'Nobody needs attention', 'No students are weak right now for this chapter.', null));
+  }
+}
+document.querySelectorAll('#screen-chapter .chip').forEach(function(chip){
+  chip.addEventListener('click', function(){
+    document.querySelectorAll('#screen-chapter .chip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    renderStudentsForChapter(chip.dataset.filter);
+  });
+});
+
+var currentStudent = null, currentInitial = null;
+function openStudent(name, initial){
+  currentStudent = name; currentInitial = initial;
+  document.getElementById('studentAvatar').textContent = initial;
+  document.getElementById('studentName').textContent = name;
+  var sObj = students.find(function(s){ return s.name===name; });
+  var rollText = sObj && sObj.roll ? ('Roll ' + sObj.roll + ' \u00b7 ') : '';
+  document.getElementById('studentChapter').textContent = rollText + currentChapter;
+
+  var wrap = document.getElementById('categoryList');
+  var emptyWrap = document.getElementById('categoryEmptyState');
+  wrap.innerHTML=''; emptyWrap.innerHTML='';
+
+  if (qtypes.length===0){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#128221;', 'No question types yet', 'Add question types in Manage first.', 'Go to Manage', goToManage));
+  } else {
+    emptyWrap.style.display='none';
+    qtypes.forEach(function(qt){
+      var tone = categoryTone(currentChapter, name, qt.name);
+      var el = document.createElement('div'); el.className='row';
+      var subClass = tone==='red' ? 'row-sub red' : 'row-sub';
+      el.innerHTML =
+        '<div class="dot '+tone+'"></div>'+
+        '<div class="row-mid"><p class="row-title">'+qt.name+'</p><p class="'+subClass+'">'+stateLabel(tone)+'</p></div>'+
+        '<span class="row-count">'+qt.count+'</span>'+
+        '<span class="chev">&#8250;</span>';
+      el.addEventListener('click', function(){ openCategory(qt.name); });
+      wrap.appendChild(el);
+    });
+  }
+  showScreen('student');
+}
+
+var currentQtype = null;
+var selectedResult = null;
+var resultMeta = {
+  incorrect: {tone:'red', state:'Weak', nextDays:1},
+  partial:   {tone:'amber', state:'Developing', nextDays:3},
+  correct:   {tone:'teal', state:'Mastered', nextDays:7}
+};
+
+function openCategory(qtypeName){
+  currentQtype = qtypeName;
+  selectedResult = null;
+  var tone = categoryTone(currentChapter, currentStudent, qtypeName);
+  document.getElementById('catDot').className = 'dot ' + tone;
+  document.getElementById('catTitle').textContent = qtypeName;
+  document.getElementById('catSub').textContent = currentStudent + ' \u00b7 ' + currentChapter;
+  document.getElementById('catState').textContent = 'Currently ' + stateLabel(tone).toLowerCase();
+  document.querySelectorAll('#screen-category .result-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.getElementById('confirmBox').classList.remove('show');
+  document.getElementById('saveBtn').disabled = true;
+  document.getElementById('saveBtn').textContent = 'Log result';
+  showScreen('category');
+}
+
+document.querySelectorAll('#screen-category .result-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('#screen-category .result-btn').forEach(function(b){ b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    selectedResult = btn.dataset.result;
+    var meta = resultMeta[selectedResult];
+    document.getElementById('confirmState').textContent = currentStudent + ' is now ' + meta.state;
+    document.getElementById('confirmNext').textContent = 'Revise again in ' + meta.nextDays + ' day' + (meta.nextDays===1?'':'s');
+    document.getElementById('confirmDot').className = 'dot ' + meta.tone;
+    document.getElementById('confirmBox').classList.add('show');
+    document.getElementById('saveBtn').disabled = false;
+  });
+});
+
+document.getElementById('saveBtn').addEventListener('click', function(){
+  if (!selectedResult) return;
+  ensureChapterData(currentChapter);
+  aggMastery[currentChapter][currentStudent][currentQtype] = resultMeta[selectedResult].tone;
+  saveState();
+  this.textContent = 'Saved';
+  this.disabled = true;
+  var self = this;
+  setTimeout(function(){
+    navHistory.pop();
+    showScreen(navHistory[navHistory.length-1], false);
+    renderDashboard();
+  }, 650);
+});
+
+document.getElementById('drillLink').addEventListener('click', function(){
+  openQtype(currentQtype);
+});
+
+function tagPath(){
+  if (!tags[currentChapter]) tags[currentChapter]={};
+  if (!tags[currentChapter][currentStudent]) tags[currentChapter][currentStudent]={};
+  if (!tags[currentChapter][currentStudent][currentQtype]) tags[currentChapter][currentStudent][currentQtype]={};
+  return tags[currentChapter][currentStudent][currentQtype];
+}
+
+function openQtype(name){
+  currentQtype = name;
+  document.getElementById('qtypeStudent').textContent = currentStudent + ' \u00b7 ' + currentChapter;
+  document.getElementById('qtypeTitle').textContent = name;
+  renderQtable();
+  showScreen('qtype');
+}
+
+function renderQtable(){
+  var qt = qtypes.find(function(q){ return q.name===currentQtype; });
+  var table = document.getElementById('qtable');
+  table.innerHTML='';
+  if (!qt) return;
+  var existing = tagPath();
+
+  for (var i=1;i<=qt.count;i++){
+    (function(num){
+      if (!existing[num]) existing[num] = {diff:null, date:null, revisions:0};
+      var entry = existing[num];
+
+      var row = document.createElement('div'); row.className='qrow';
+      var label = document.createElement('div'); label.className='qnum-label'; label.textContent = 'Q'+num;
+      row.appendChild(label);
+
+      var dotsWrap = document.createElement('div'); dotsWrap.className='diff-dots';
+      diffOrder.forEach(function(d){
+        var b = document.createElement('button');
+        b.className = 'diff-dot-btn' + (entry.diff===d ? ' active-'+d : (entry.diff ? ' dim' : ''));
+        b.setAttribute('aria-label', diffShort[d]);
+        b.addEventListener('click', function(){
+          if (entry.diff===d){
+            entry.diff = null; entry.date = null;
+          } else {
+            var isNew = !entry.diff;
+            entry.diff = d;
+            if (isNew) entry.revisions = (entry.revisions||0) + 1;
+            entry.date = addDays(suggestedIntervalDays(d, entry.revisions));
+          }
+          renderQtable();
+          renderDashboard();
+          saveState();
+        });
+        dotsWrap.appendChild(b);
+      });
+      row.appendChild(dotsWrap);
+
+      var counterRow = document.createElement('div'); counterRow.className='counter-row';
+      var minus = document.createElement('button'); minus.textContent='\u2212';
+      minus.addEventListener('click', function(){
+        entry.revisions = Math.max(0,(entry.revisions||0)-1);
+        if (entry.diff) entry.date = addDays(suggestedIntervalDays(entry.diff, entry.revisions || 1));
+        renderQtable();
+        saveState();
+      });
+      var val = document.createElement('span'); val.className='count-val'; val.textContent = entry.revisions||0;
+      var plus = document.createElement('button'); plus.textContent='+';
+      plus.addEventListener('click', function(){
+        entry.revisions = (entry.revisions||0)+1;
+        if (entry.diff) entry.date = addDays(suggestedIntervalDays(entry.diff, entry.revisions));
+        renderQtable();
+        saveState();
+      });
+      counterRow.appendChild(minus); counterRow.appendChild(val); counterRow.appendChild(plus);
+      row.appendChild(counterRow);
+
+      var nextDate = document.createElement('div'); nextDate.className='next-date';
+      nextDate.textContent = entry.date ? fmtDate(entry.date) : 'Skipped';
+      row.appendChild(nextDate);
+
+      table.appendChild(row);
+    })(i);
+  }
+}
+
+function refreshChapterSubjectDropdown(){
+  var sel = document.getElementById('newChapterSubject');
+  var current = sel.value;
+  sel.innerHTML = '<option value="">Pick a subject</option>';
+  subjects.forEach(function(sub){
+    var opt = document.createElement('option');
+    opt.value = sub.name; opt.textContent = sub.name;
+    sel.appendChild(opt);
+  });
+  if (subjects.some(function(s){ return s.name===current; })) sel.value = current;
+
+  var chapterNameInput = document.getElementById('newChapterInput');
+  var addChapterBtn = document.getElementById('addChapterBtn');
+  var disabled = subjects.length===0;
+  chapterNameInput.disabled = disabled;
+  addChapterBtn.disabled = disabled;
+  chapterNameInput.placeholder = disabled ? 'Add a subject first' : 'New chapter name';
+}
+
+function renderClassPickerList(){
+  var wrap = document.getElementById('classPickerList');
+  var emptyWrap = document.getElementById('classPickerEmptyState');
+  wrap.innerHTML=''; emptyWrap.innerHTML='';
+  if (classes.length===0){
+    emptyWrap.style.display='block';
+    emptyWrap.appendChild(emptyState('&#127891;', 'No classes yet', 'Add your first class (e.g. Class 9) in Manage.', 'Go to Manage', function(){
+      navHistory = ['manage']; showScreen('manage', false);
+    }));
+    return;
+  }
+  emptyWrap.style.display='none';
+  classes.forEach(function(c){
+    var el = document.createElement('div'); el.className='class-row';
+    el.innerHTML =
+      '<div class="class-emoji">'+(c.emoji||'&#127891;')+'</div>'+
+      '<div class="row-mid"><p class="class-name">'+c.name+'</p></div>'+
+      '<span class="chev">&#8250;</span>';
+    el.addEventListener('click', function(){
+      switchToClass(c.name);
+      navHistory = ['dashboard'];
+      showScreen('dashboard', false);
+    });
+    wrap.appendChild(el);
+  });
+}
+
+document.getElementById('classChip').addEventListener('click', goToClassPicker);
+
+document.getElementById('addClassBtn').addEventListener('click', function(){
+  var nameInput = document.getElementById('newClassInput');
+  var emojiInput = document.getElementById('newClassEmoji');
+  var name = nameInput.value.trim();
+  if (!name) return;
+  if (classes.some(function(c){ return c.name.toLowerCase()===name.toLowerCase(); })) { nameInput.value=''; return; }
+  classes.push({name:name, emoji:emojiInput.value.trim()});
+  classData[name] = blankClassData();
+  nameInput.value=''; emojiInput.value='';
+  renderManage();
+  renderClassPickerList();
+  if (!currentClassName) { switchToClass(name); }
+  saveState();
+});
+
+function renderManageClasses(){
+  var wrap = document.getElementById('manageClasses');
+  wrap.innerHTML='';
+  classes.forEach(function(c, idx){
+    var el = document.createElement('div'); el.className='manage-item';
+
+    var display = document.createElement('span');
+    display.innerHTML = (c.emoji ? c.emoji+' ' : '') + c.name + (c.name===currentClassName ? ' <span class="qcount">(current)</span>' : '');
+    el.appendChild(display);
+
+    var btnWrap = document.createElement('span');
+    var editBtn = document.createElement('button'); editBtn.className='manage-edit-btn'; editBtn.textContent='\u270E';
+    var rm = document.createElement('button'); rm.className='remove-btn'; rm.textContent='\u2212';
+
+    editBtn.addEventListener('click', function(){
+      el.innerHTML='';
+      var editRow = document.createElement('div'); editRow.className='class-edit-row';
+      var emojiIn = document.createElement('input'); emojiIn.className='emoji-input'; emojiIn.value = c.emoji || '';
+      var nameIn = document.createElement('input'); nameIn.className='name-input'; nameIn.value = c.name;
+      var saveBtn = document.createElement('button'); saveBtn.className='save-mini'; saveBtn.textContent='Save';
+      var cancelBtn = document.createElement('button'); cancelBtn.className='cancel-mini'; cancelBtn.textContent='Cancel';
+      saveBtn.addEventListener('click', function(){
+        var newName = nameIn.value.trim();
+        if (!newName) return;
+        var oldName = c.name;
+        if (newName !== oldName){
+          if (classes.some(function(cc){ return cc.name.toLowerCase()===newName.toLowerCase() && cc!==c; })) return;
+          classData[newName] = classData[oldName];
+          delete classData[oldName];
+          if (currentClassName === oldName) currentClassName = newName;
+        }
+        c.name = newName;
+        c.emoji = emojiIn.value.trim();
+        renderManage();
+        renderClassPickerList();
+        updateClassChip();
+        saveState();
+      });
+      cancelBtn.addEventListener('click', function(){ renderManage(); });
+      editRow.appendChild(emojiIn); editRow.appendChild(nameIn); editRow.appendChild(saveBtn); editRow.appendChild(cancelBtn);
+      el.appendChild(editRow);
+    });
+
+    rm.addEventListener('click', function(){
+      var ok = confirm('Delete "'+c.name+'" and all its subjects, chapters, students and question types? This cannot be undone.');
+      if (!ok) return;
+      classes.splice(idx,1);
+      delete classData[c.name];
+      if (currentClassName === c.name){
+        currentClassName = null;
+        var next = classes[0];
+        if (next) { switchToClass(next.name); }
+        else { subjects=[]; chapters=[]; students=[]; qtypes=[]; aggMastery={}; tags={}; updateClassChip(); renderDashboard(); renderChaptersList(); }
+      }
+      renderManage();
+      renderClassPickerList();
+      saveState();
+    });
+
+    btnWrap.appendChild(editBtn); btnWrap.appendChild(rm);
+    el.appendChild(btnWrap);
+    wrap.appendChild(el);
+  });
+}
+
+function renderManage(){
+  renderManageClasses();
+
+  var perClass = document.getElementById('perClassManage');
+  var noClassHint = document.getElementById('noClassManageHint');
+  var banner = document.getElementById('manageContextBanner');
+  if (!currentClassName){
+    perClass.style.display='none';
+    noClassHint.style.display='block';
+    return;
+  }
+  perClass.style.display='block';
+  noClassHint.style.display='none';
+  var cls = classes.find(function(c){ return c.name===currentClassName; });
+  banner.textContent = 'Editing: ' + (cls ? [cls.emoji, cls.name].filter(Boolean).join(' ') : currentClassName);
+
+  var subWrap = document.getElementById('manageSubjects');
+  subWrap.innerHTML='';
+  subjects.forEach(function(sub, idx){
+    var el = document.createElement('div'); el.className='manage-item';
+    el.innerHTML = '<span>'+sub.name+'</span>';
+    var rm = document.createElement('button'); rm.className='remove-btn'; rm.textContent='\u2212';
+    rm.addEventListener('click', function(){
+
+      var inUse = chapters.some(function(ch){ return ch.subjectName===sub.name; });
+      if (inUse){
+        alert('Remove or reassign chapters under "'+sub.name+'" first.');
+        return;
+      }
+      subjects.splice(idx,1); renderManage(); saveState();
+    });
+    el.appendChild(rm);
+    subWrap.appendChild(el);
+  });
+  refreshChapterSubjectDropdown();
+
+  var cWrap = document.getElementById('manageChapters');
+  cWrap.innerHTML='';
+  chapters.forEach(function(ch, idx){
+    var el = document.createElement('div'); el.className='manage-item';
+    el.innerHTML = '<span>'+ch.name+' <span class="qcount">('+(ch.subjectName||'no subject')+')</span></span>';
+    var rm = document.createElement('button'); rm.className='remove-btn'; rm.textContent='\u2212';
+    rm.addEventListener('click', function(){ chapters.splice(idx,1); renderManage(); renderDashboard(); renderChaptersList(); saveState(); });
+    el.appendChild(rm);
+    cWrap.appendChild(el);
+  });
+
+  var sWrap = document.getElementById('manageStudents');
+  sWrap.innerHTML='';
+  students.forEach(function(s, idx){
+    var el = document.createElement('div'); el.className='manage-item';
+    var rollTxt = s.roll ? (' \u00b7 Roll ' + s.roll) : '';
+    el.innerHTML = '<span>'+(s.emoji ? s.emoji+' ' : '')+s.name+' <span class="qcount">'+rollTxt+'</span></span>';
+    var rm = document.createElement('button'); rm.className='remove-btn'; rm.textContent='\u2212';
+    rm.addEventListener('click', function(){ students.splice(idx,1); renderManage(); renderDashboard(); saveState(); });
+    el.appendChild(rm);
+    sWrap.appendChild(el);
+  });
+
+  var qWrap = document.getElementById('manageQtypes');
+  qWrap.innerHTML='';
+  qtypes.forEach(function(qt, idx){
+    var el = document.createElement('div'); el.className='manage-item';
+    el.innerHTML = '<span>'+qt.name+' <span class="qcount">('+qt.count+' questions)</span></span>';
+    var rm = document.createElement('button'); rm.className='remove-btn'; rm.textContent='\u2212';
+    rm.addEventListener('click', function(){ qtypes.splice(idx,1); renderManage(); renderDashboard(); saveState(); });
+    el.appendChild(rm);
+    qWrap.appendChild(el);
+  });
+}
+
+document.getElementById('addSubjectBtn').addEventListener('click', function(){
+  var input = document.getElementById('newSubjectInput');
+  var name = input.value.trim();
+  if (!name) return;
+  if (subjects.some(function(s){ return s.name.toLowerCase()===name.toLowerCase(); })) { input.value=''; return; }
+  subjects.push({name:name});
+  input.value='';
+  renderManage();
+  saveState();
+});
+
+document.getElementById('addChapterBtn').addEventListener('click', function(){
+  var input = document.getElementById('newChapterInput');
+  var subjectSel = document.getElementById('newChapterSubject');
+  var subjectName = subjectSel.value;
+  if (!input.value.trim() || !subjectName) return;
+  var name = input.value.trim();
+  chapters.push({name:name, subjectName:subjectName});
+  ensureChapterData(name);
+  input.value='';
+  renderManage(); renderDashboard(); renderChaptersList();
+  saveState();
+});
+
+document.getElementById('addStudentBtn').addEventListener('click', function(){
+  var input = document.getElementById('newStudentInput');
+  var emojiInput = document.getElementById('newStudentEmoji');
+  var rollInput = document.getElementById('newStudentRoll');
+  if (!input.value.trim()) return;
+  var name = input.value.trim();
+  students.push({
+    name:name,
+    initial:name[0].toUpperCase(),
+    emoji: emojiInput.value.trim(),
+    roll: rollInput.value.trim()
+  });
+  chapters.forEach(function(ch){ ensureChapterData(ch.name); });
+  input.value=''; emojiInput.value=''; rollInput.value='';
+  renderManage(); renderDashboard();
+  saveState();
+});
+
+document.getElementById('addQtypeBtn').addEventListener('click', function(){
+  var nameInput = document.getElementById('newQtypeInput');
+  var countInput = document.getElementById('newQtypeCount');
+  if (!nameInput.value.trim() || !countInput.value) return;
+  qtypes.push({name:nameInput.value.trim(), count:parseInt(countInput.value,10)});
+  chapters.forEach(function(ch){ ensureChapterData(ch.name); });
+  nameInput.value=''; countInput.value='';
+  renderManage(); renderDashboard();
+  saveState();
+});
+
+function applyProfileToHeader(){
+  var line = document.getElementById('teacherLine');
+  if (profile.emoji || profile.name){
+    line.textContent = [profile.emoji, profile.name].filter(Boolean).join(' ');
+    line.style.display = 'block';
+  } else {
+    line.style.display = 'none';
+  }
+}
+
+document.getElementById('saveProfileBtn').addEventListener('click', function(){
+  profile.emoji = document.getElementById('profileEmojiInput').value.trim();
+  profile.name = document.getElementById('profileNameInput').value.trim();
+  applyProfileToHeader();
+  saveState();
+  this.textContent = 'Saved';
+  var self = this;
+  setTimeout(function(){ self.textContent = 'Save'; }, 900);
+});
+
+document.querySelector('[data-screen="manage"]').addEventListener('click', function(){
+  document.getElementById('profileEmojiInput').value = profile.emoji;
+  document.getElementById('profileNameInput').value = profile.name;
+});
+
+var db = null;
+if (typeof Dexie !== 'undefined') {
+  db = new Dexie('TotalRecallDB');
+  db.version(1).stores({ store: 'id' });
+}
+
+function saveState() {
+  if (!db) return;
+  db.store.put({
+    id: 'appState',
+    classes: classes,
+    classData: classData,
+    currentClassName: currentClassName,
+    profile: profile
+  }).catch(function (err) { console.error('Save failed', err); });
+}
+
+function loadStateThenInit() {
+  if (!db) { initApp(); return; }
+  db.store.get('appState').then(function (saved) {
+    if (saved) {
+      classes = saved.classes || [];
+      classData = saved.classData || {};
+      currentClassName = saved.currentClassName || null;
+      profile = saved.profile || {emoji:'', name:''};
+      if (currentClassName && classData[currentClassName]) {
+        var d = classData[currentClassName];
+        subjects = d.subjects || []; chapters = d.chapters || []; students = d.students || [];
+        qtypes = d.qtypes || []; aggMastery = d.aggMastery || {}; tags = d.tags || {};
+      } else {
+        currentClassName = null;
+      }
+    }
+    initApp();
+  }).catch(function (err) {
+    console.error('Load failed, starting fresh', err);
+    initApp();
+  });
+}
+
+function initApp() {
+  chapters.forEach(function (ch) { ensureChapterData(ch.name); });
+  updateClassChip();
+  renderClassPickerList();
+  renderDashboard();
+  renderChaptersList();
+  renderManage();
+  applyProfileToHeader();
+  if (!currentClassName) {
+    goToClassPicker();
+  }
+}
+
+loadStateThenInit();
+</script>
+<script>
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function (err) {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
